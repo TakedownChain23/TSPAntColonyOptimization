@@ -43,7 +43,7 @@ public static class AntColonyOptimization
             if (shortestPath.length < result.length)
             {
                 result = shortestPath;
-                Console.WriteLine($"New Optimal Path Length: {shortestPath.length}");
+                Console.WriteLine($"Iteration: {i}, New Length: {shortestPath.length}");
             }
 
             AddPheremones(pheremoneMatrix, shortestPath.path, shortestPath.length, true);
@@ -86,25 +86,28 @@ public static class AntColonyOptimization
     static int[] ConstructPath(double[,] distanceMatrix, double[,] pheremoneMatrix)
     {
         var nodeCount = distanceMatrix.GetLength(0);
-        var path = new List<int> { new Random().Next(nodeCount) };
+        var nextNode = new Random().Next(nodeCount);
+        var path = new List<int> { nextNode };
+        var remainingNodes = Enumerable.Range(0, distanceMatrix.GetLength(0)).ToList();
+        remainingNodes.Remove(nextNode);
 
         for (int i = 0; i < nodeCount - 1; i++)
         {
-            var nextNode = GetNextNode(distanceMatrix, pheremoneMatrix, path);
+            nextNode = GetNextNode(distanceMatrix, pheremoneMatrix, nextNode, remainingNodes);
             path.Add(nextNode);
+            remainingNodes.Remove(nextNode);
         }
 
         return [.. path];
     }
 
-    static int GetNextNode(double[,] distanceMatrix, double[,] pheremoneMatrix, List<int> visitedNodes)
+    static int GetNextNode(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, List<int> remainingNodes)
     {
-        var remainingNodes = Enumerable.Range(0, distanceMatrix.GetLength(0)).Where(node => !visitedNodes.Contains(node)).ToArray();
-        var probabilities = remainingNodes.Select(node => CalculateRelativeProbability(distanceMatrix, pheremoneMatrix, visitedNodes.Last(), node)).ToArray();
+        var probabilities = remainingNodes.Select(node => CalculateRelativeProbability(distanceMatrix, pheremoneMatrix, currentNode, node)).ToArray();
 
         var randomValue = new Random().NextDouble() * probabilities.Sum();
         var cumulativeValue = 0.0;
-        for (int i = 0; i < remainingNodes.Length - 1; i++)
+        for (int i = 0; i < remainingNodes.Count - 1; i++)
         {
             cumulativeValue += probabilities[i];
             if (cumulativeValue > randomValue)

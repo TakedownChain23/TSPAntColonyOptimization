@@ -8,7 +8,19 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <None Update="TSPLIB\berlin52.tsp">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
       <None Update="TSPLIB\eil51.tsp">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="TSPLIB\linhp318.tsp">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="TSPLIB\rl11849.tsp">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="TSPLIB\rl1304.tsp">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>
