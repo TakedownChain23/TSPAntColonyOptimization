@@ -8,6 +8,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
       <None Update="TSPLIB\eil51.tsp">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
