@@ -22,8 +22,10 @@ public class Christofides
         var mst = ComputeMinimumSpanningTree(nodeDistances, n);
 
         // Find odd-degree vertices
-        var oddVertices = FindOddDegreeVertices(mst, n);
-
+        var oddDegreeVerticesOutput = FindOddDegreeVertices(mst, n);
+        var adjacency = oddDegreeVerticesOutput.Item1;
+        var oddVertices = oddDegreeVerticesOutput.Item2;
+        
         // Compute minimum-weight perfect matching
         var matching = ComputeMinimumWeightMatching(oddVertices, nodeDistances);
 
@@ -31,7 +33,7 @@ public class Christofides
         var eulerianGraph = CombineGraphs(mst, matching);
 
         // Find Eulerian tour
-        var eulerianTour = FindEulerianTour(eulerianGraph, n);
+        var eulerianTour = FindEulerianTour(adjacency, n);
 
         // Shortcut repeated vertices → Hamiltonian TSP tour
         return ShortcutEulerianTour(eulerianTour, eulerianGraph);
@@ -75,25 +77,30 @@ public class Christofides
         return mst;
     }
 
-    public static List<int> FindOddDegreeVertices(List<Edge> mst, int n)
+    public static (int[,], List<int>) FindOddDegreeVertices(List<Edge> mst, int n)
     {
-        var vertexDegrees = new int[n];
+        var vertexDegrees = new int[n, n];
         foreach (var e in mst)
         {
-            vertexDegrees[e.PointA]++;
-            vertexDegrees[e.PointB]++;
+            vertexDegrees[e.PointA, e.PointB]++;
+            vertexDegrees[e.PointB, e.PointA]++;
         }
 
         var oddVertices = new List<int>();
-        for (var i = 0; i < n; i++)
+        for (var u = 0; u < n; u++)
         {
-            if (vertexDegrees[i] % 2 == 1)
+            var degree = 0;
+
+            for (var v = 0; v < n; v++)
             {
-                oddVertices.Add(i);
+                degree += vertexDegrees[u, v];
             }
+
+            if (degree % 2 == 1)
+                oddVertices.Add(u);
         }
 
-        return oddVertices;
+        return (vertexDegrees,  oddVertices);
     }
 
     public static List<Edge> ComputeMinimumWeightMatching(List<int> oddVertices, double[,] nodeDistances)
@@ -110,15 +117,29 @@ public class Christofides
         return combined;    
     }
 
-    public static List<int> FindEulerianTour(List<Edge> eulerianGraph, int n)
+    public static List<int> FindEulerianTour(int[,] adjacency, int n) // Using Hierholzer's algorithm
     {
-        // Eulerian tour algorithm ( will probably use Hierholzer)
-        // Hierholzer steps:
-        // - Build adjacency list from graph
-        // - Start at any vertex
-        // - Traverse edges recursively, removing as you go
-        // - Record vertices visited in order
-        return null; 
+        var currentPath = new List<int> { 0 };
+        var graphCircuit = new List<int>();
+        while (currentPath.Count > 0)
+        {
+            var currentNode = currentPath.Last();
+
+            if (adjacency.GetLength(currentNode) > 0)
+            {
+                var nextNode = adjacency[currentNode, adjacency.GetLength(currentNode) - 1];
+                adjacency[currentNode, adjacency.GetLength(currentNode) - 1] = 0;
+                
+                currentPath.Add(nextNode);
+            }
+            else
+            {
+                graphCircuit.Add(currentPath.Last());
+                currentPath.RemoveAt(currentPath.Count - 1);
+            }
+        }
+        graphCircuit.Reverse();
+        return graphCircuit;
     }
 
     public static (int[], double) ShortcutEulerianTour(List<int> eulerianTour, List<Edge> eulerianGraph)
