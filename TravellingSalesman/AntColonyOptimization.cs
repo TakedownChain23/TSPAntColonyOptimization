@@ -6,83 +6,69 @@ public static class AntColonyOptimization
     readonly static int Iterations = 400;
 
     readonly static double Alpha = 1;
-    readonly static double Beta = 3;
+    readonly static double Beta = 2;
 
-    readonly static double Rho = 0.22;
+    readonly static double Rho = 0.2;
 
     readonly static double PheremoneDepositWeight = 1;
 
-    readonly static double MinScalingFactor = 0.0001;
+    readonly static double MinScalingFactor = 0.001;
 
-    public static (int[] path, double length) RunTSP(double[,] distanceMatrix)
+    public static (int[] nodes, double length) RunTSP(double[,] distanceMatrix)
     {
         var nodeCount = distanceMatrix.GetLength(0);
         var pheremoneMatrix = new double[nodeCount, nodeCount];
 
-        (int[] path, double length) result = GetInitialResult(distanceMatrix);
+        (int[] nodes, double length) result = GetInitialPathResult(distanceMatrix);
         UpdatePheremones(pheremoneMatrix, result.length);
 
         for (int i = 0; i < Iterations; i++)
         {
-            var pathLengths = new List<(int[] path, double length)>();
+            var paths = new List<(int[] nodes, double length)>();
 
             Parallel.For(0, ColonySize, _ =>
             {
-                var path = ConstructPath(distanceMatrix, pheremoneMatrix);
-                lock (pathLengths)
-                {
-                    pathLengths.Add((path, GetPathLength(distanceMatrix, path)));
-                }
+                var pathNodes = ConstructPath(distanceMatrix, pheremoneMatrix);
+                paths.Add((pathNodes, GetPathLength(distanceMatrix, pathNodes)));
             });
 
-            var shortestPath = pathLengths.MinBy(p => p.length);
+            var shortestPath = paths.MinBy(p => p.length);
             if (shortestPath.length < result.length)
             {
                 result = shortestPath;
                 Console.WriteLine($"Iteration: {i}, New Length: {shortestPath.length}");
             }
 
-            AddPheremones(pheremoneMatrix, shortestPath.path, shortestPath.length);
+            AddPheremones(pheremoneMatrix, shortestPath.nodes, shortestPath.length);
             UpdatePheremones(pheremoneMatrix, result.length);
         }
 
         return result;
     }
 
-    static void UpdatePheremones(double[,] pheremoneMatrix, double shortestPathLength)
+    static (int[] path, double length) GetInitialPathResult(double[,] distanceMatrix)
     {
-        var max = PheremoneDepositWeight / shortestPathLength;
-        var min = max * MinScalingFactor;
-        
-        for (int i = 0; i < pheremoneMatrix.GetLength(0); i++)
-        {
-            for (int j = 0; j < pheremoneMatrix.GetLength(1); j++)
-            {
-                pheremoneMatrix[i, j] = Math.Clamp(pheremoneMatrix[i, j] * (1 - Rho), min, max);
-            }
-        }
+        var nodes = Enumerable.Range(0, distanceMatrix.GetLength(0)).ToArray();
+        return (nodes, GetPathLength(distanceMatrix, nodes));
     }
 
-    static void AddPheremones(double[,] pheremoneMatrix, int[] path, double pathLength, double weight = 1)
+    static double GetPathLength(double[,] distanceMatrix, int[] nodes)
     {
-        var pheremoneDeposit = PheremoneDepositWeight * weight / (pathLength + 0.05);
-
-        for (int i = 0; i < path.Length - 1; i++)
+        var length = distanceMatrix[nodes[^1], nodes[0]];
+        for (int i = 0; i < nodes.Length - 1; i++)
         {
-            pheremoneMatrix[path[i], path[i + 1]] += pheremoneDeposit;
-            pheremoneMatrix[path[i + 1], path[i]] += pheremoneDeposit;
+            length += distanceMatrix[nodes[i], nodes[i + 1]];
         }
 
-        pheremoneMatrix[path[^1], path[0]] += pheremoneDeposit;
-        pheremoneMatrix[path[0], path[^1]] += pheremoneDeposit;
+        return length;
     }
 
     static int[] ConstructPath(double[,] distanceMatrix, double[,] pheremoneMatrix)
     {
         var nodeCount = distanceMatrix.GetLength(0);
         var nextNode = new Random().Next(nodeCount);
-        var path = new int[nodeCount];
-        path[0] = nextNode;
+        var pathNodes = new int[nodeCount];
+        pathNodes[0] = nextNode;
 
         var remainingNodes = Enumerable.Range(0, distanceMatrix.GetLength(0)).ToList();
         remainingNodes.Remove(nextNode);
@@ -90,17 +76,17 @@ public static class AntColonyOptimization
         for (int i = 1; i < nodeCount; i++)
         {
             nextNode = GetNextNode(distanceMatrix, pheremoneMatrix, nextNode, remainingNodes);
-            path[i] = nextNode;
+            pathNodes[i] = nextNode;
 
             remainingNodes.Remove(nextNode);
         }
 
-        return [.. path];
+        return pathNodes;
     }
 
     static int GetNextNode(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, List<int> remainingNodes)
     {
-        var probabilities = remainingNodes.Select(node => CalculateRelativeProbability(distanceMatrix, pheremoneMatrix, currentNode, node)).ToArray();
+        var probabilities = remainingNodes.Select(n => CalculateRelativeProbability(distanceMatrix, pheremoneMatrix, currentNode, n)).ToArray();
 
         var randomValue = new Random().NextDouble() * probabilities.Sum();
         var cumulativeValue = 0.0;
@@ -121,20 +107,31 @@ public static class AntColonyOptimization
         return Math.Pow(pheremoneMatrix[currentNode, nextNode], Alpha) * Math.Pow(1.0 / (distanceMatrix[currentNode, nextNode] + 0.05), Beta);
     }
 
-    static double GetPathLength(double[,] distanceMatrix, int[] path)
+    static void AddPheremones(double[,] pheremoneMatrix, int[] pathNodes, double pathLength)
     {
-        var length = distanceMatrix[path[^1], path[0]];
-        for (int i = 0; i < path.Length - 1; i++)
+        var pheremoneDeposit = PheremoneDepositWeight / (pathLength + 0.05);
+
+        for (int i = 0; i < pathNodes.Length - 1; i++)
         {
-            length += distanceMatrix[path[i], path[i + 1]];
+            pheremoneMatrix[pathNodes[i], pathNodes[i + 1]] += pheremoneDeposit;
+            pheremoneMatrix[pathNodes[i + 1], pathNodes[i]] += pheremoneDeposit;
         }
 
-        return length;
+        pheremoneMatrix[pathNodes[^1], pathNodes[0]] += pheremoneDeposit;
+        pheremoneMatrix[pathNodes[0], pathNodes[^1]] += pheremoneDeposit;
     }
 
-    static (int[] path, double length) GetInitialResult(double[,] distanceMatrix)
+    static void UpdatePheremones(double[,] pheremoneMatrix, double shortestPathLength)
     {
-        var path = Enumerable.Range(0, distanceMatrix.GetLength(0)).ToArray();
-        return (path, GetPathLength(distanceMatrix, path));
+        var max = PheremoneDepositWeight / shortestPathLength;
+        var min = max * MinScalingFactor;
+        
+        for (int i = 0; i < pheremoneMatrix.GetLength(0); i++)
+        {
+            for (int j = 0; j < pheremoneMatrix.GetLength(1); j++)
+            {
+                pheremoneMatrix[i, j] = Math.Clamp(pheremoneMatrix[i, j] * (1 - Rho), min, max);
+            }
+        }
     }
 }
