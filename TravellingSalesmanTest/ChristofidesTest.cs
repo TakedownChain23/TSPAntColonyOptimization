@@ -1,125 +1,143 @@
 using NUnit.Framework;
 using System.Collections.Generic;
+using TravellingSalesman;
 
-[TestFixture]
-public class ChristofidesTest
+namespace TravellingSalesmanTest
 {
-    private double[,] smallDistanceMatrix;
-    private double[,] asymmetricDistanceMatrix;
-
-    [SetUp]
-    public void Setup()
+    [TestFixture]
+    public class ChristofidesTests
     {
-        // Small symmetric metric TSP (triangle inequality holds)
-        smallDistanceMatrix = new double[,]
+        [Test]
+        public void ComputeMinimumSpanningTree_ReturnsSquareMatrix()
         {
-            { 0, 2, 9, 10 },
-            { 2, 0, 6, 4 },
-            { 9, 6, 0, 8 },
-            { 10, 4, 8, 0 }
-        };
+            var distances = TestGraphs.SquareGraph();
+            var mst = Christofides.ComputeMinimumSpanningTree(distances);
 
-        // Optional: asymmetric example
-        asymmetricDistanceMatrix = new double[,]
+            Assert.That(mst.GetLength(0), Is.EqualTo(4));
+            Assert.That(mst.GetLength(1), Is.EqualTo(4));
+        }
+
+        [Test]
+        public void ComputeMinimumSpanningTree_HasExactlyNMinusOneEdges()
         {
-            { 0, 3, 4 },
-            { 2, 0, 6 },
-            { 5, 1, 0 }
-        };
-    }
-    
-    [Test]
-    public void SolveReturnsTourOfCorrectLength()
-    {
-        // Check that tour includes each city once plus return to start
-        Assert.Pass();
-    }
+            var distances = TestGraphs.SquareGraph();
+            var mst = Christofides.ComputeMinimumSpanningTree(distances);
 
-    [Test]
-    public void SolveTourStartsAndEndsAtSameCity()
-    {
-        // Ensure returned tour is a closed cycle
-        Assert.Pass();
-    }
+            var edgeCount = 0;
+            for (var i = 0; i < 4; i++)
+            for (var j = i + 1; j < 4; j++)
+                edgeCount += mst[i, j];
 
-    [Test]
-    public void SolveTourContainsAllVertices()
-    {
-        // Ensure all vertices are present exactly once in tour
-        Assert.Pass();
-    }
+            Assert.That(edgeCount, Is.EqualTo(3));
+        }
 
-    [Test]
-    public void SolveProducesReasonableCost()
-    {
-        // Compare tour cost against small known optimal (if available)
-        Assert.Pass();
-    }
+        [Test]
+        public void FindOddDegreeVertices_ReturnsEvenNumberOfVertices()
+        {
+            var distances = TestGraphs.SquareGraph();
+            var mst = Christofides.ComputeMinimumSpanningTree(distances);
+            var oddVertices = Christofides.FindOddDegreeVertices(mst);
 
-    [Test]
-    public void ComputeMinimumSpanningTreeGeneratesCorrectNumberOfEdges()
-    {
-        // MST should have (n-1) edges
-        Assert.Pass();
-    }
+            Assert.That(oddVertices.Count % 2, Is.EqualTo(0));
+        }
 
-    [Test]
-    public void FindOddDegreeVerticesReturnsEvenNumber()
-    {
-        // MST odd-degree vertices count must be even
-        Assert.Pass();
-    }
+        [Test]
+        public void FindOddDegreeVertices_AllReturnedVerticesHaveOddDegree()
+        {
+            var distances = TestGraphs.SquareGraph();
+            var mst = Christofides.ComputeMinimumSpanningTree(distances);
+            var oddVertices = Christofides.FindOddDegreeVertices(mst);
 
-    [Test]
-    public void ComputeMinimumWeightMatchingPairsAllOddVertices()
-    {
-        // All odd vertices should be matched
-        Assert.Pass();
-    }
+            foreach (var u in oddVertices)
+            {
+                var degree = 0;
+                for (var v = 0; v < mst.GetLength(0); v++)
+                    degree += mst[u, v];
 
-    [Test]
-    public void CombineGraphsContainsAllMstAndMatchingEdges()
-    {
-        // Combined graph should include all edges from MST and matching
-        Assert.Pass();
-    }
+                Assert.That(degree % 2, Is.EqualTo(1));
+            }
+        }
 
-    [Test]
-    public void ShortcutEulerianTourRemovesDuplicateVertices()
-    {
-        // Eulerian tour shortcutting should not repeat vertices
-        Assert.Pass();
-    }
+        [Test]
+        public void RunBlossom_MatchesAllVerticesExactlyOnce()
+        {
+            var distances = TestGraphs.SquareGraph();
+            var vertices = new List<int> { 0, 1, 2, 3 };
 
-    [Test]
-    public void SingleCityReturnsTrivialTour()
-    {
-        double[,] matrix = { { 0.0 } };
-        // Should return tour [0,0]
-        Assert.Pass();
-    }
+            var matching = Christofides.RunBlossom(vertices, distances);
 
-    [Test]
-    public void TwoCitiesReturnsCorrectTour()
-    {
-        double[,] matrix = { { 0, 1 }, { 1, 0 } };
-        // Should return tour [0,1,0]
-        Assert.Pass();
-    }
+            var seen = new HashSet<int>();
+            foreach (var (u, v) in matching)
+            {
+                Assert.That(seen, Does.Not.Contain(u));
+                Assert.That(seen, Does.Not.Contain(v));
+                seen.Add(u);
+                seen.Add(v);
+            }
 
-    [Test]
-    public void NullDistanceMatrixThrowsException()
-    {
-        double[,] matrix = null;
-        // Your method should throw ArgumentNullException
-        Assert.Pass();
-    }
+            Assert.That(vertices.Count, Is.EqualTo(seen.Count));
+        }
 
-    [Test]
-    public void NegativeEdgeWeightsHandledCorrectlyOrRejected()
-    {
-        double[,] matrix = { { 0, -1 }, { -1, 0 } };
-        // Decide behavior: reject or handle gracefully
-        Assert.Pass();
+        [Test]
+        public void FindEulerianTour_StartsAndEndsAtSameVertex()
+        {
+            var distances = TestGraphs.SquareGraph();
+            var mst = Christofides.ComputeMinimumSpanningTree(distances);
+            var odd = Christofides.FindOddDegreeVertices(mst);
+            var matching = Christofides.RunBlossom(odd, distances);
+
+            Christofides.AddMatchingToGraph(mst, matching);
+            var tour = Christofides.FindEulerianTour(mst);
+
+            Assert.That(tour.Count, Is.GreaterThan(1));
+            Assert.That(tour[0], Is.EqualTo(tour[^1]));
+        }
+
+        [Test]
+        public void ShortcutEulerianTour_VisitsAllVerticesExactlyOnce()
+        {
+            var distances = TestGraphs.RandomMetricGraph(10);
+            var (tour, _) = Christofides.RunAlgorithm(distances);
+
+            var uniqueVertices = new HashSet<int>(tour);
+            Assert.That(distances.GetLength(0) + 1, Is.EqualTo(tour.Length));
+            Assert.That(tour[0], Is.EqualTo(tour[^1]));
+            Assert.That(distances.GetLength(0), Is.EqualTo(uniqueVertices.Count));
+        }
+
+        [Test]
+        public void ShortcutEulerianTour_ReturnsFinitePositiveCost()
+        {
+            var distances = TestGraphs.RandomMetricGraph(10);
+            var (_, cost) = Christofides.RunAlgorithm(distances);
+
+            Assert.That(cost, Is.GreaterThan(0));
+            Assert.That(double.IsNaN(cost), Is.False);
+            Assert.That(double.IsInfinity(cost), Is.False);
+        }
+
+        [Test]
+        public void RunAlgorithm_ReturnsValidHamiltonianCycle()
+        {
+            var distances = TestGraphs.RandomMetricGraph(20);
+
+            var (tour, length) = Christofides.RunAlgorithm(distances);
+
+            Assert.That(tour[0], Is.EqualTo(tour[^1]));
+            Assert.That(distances.GetLength(0) + 1, Is.EqualTo(tour.Length));
+            Assert.That(length, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void RunAlgorithm_IsDeterministicForSameInput()
+        {
+            var distances = TestGraphs.RandomMetricGraph(15);
+
+            var result1 = Christofides.RunAlgorithm(distances);
+            var result2 = Christofides.RunAlgorithm(distances);
+
+            Assert.That(result1.length, Is.EqualTo(result2.length));
+            Assert.That(result1.tour, Is.EquivalentTo(result2.tour));
+        }
     }
 }
