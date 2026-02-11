@@ -1,181 +1,247 @@
 namespace TravellingSalesman;
 
-public class Christofides
+public static class Christofides
 {
-    public class Edge
+    public static (int[] tour, double length) RunAlgorithm(double[,] distances)
     {
-        public readonly int PointA;
-        public readonly int PointB;
-        public readonly double Weight;
-        public Edge(int a, int b, double weight)
-        {
-            PointA = a;
-            PointB = b;
-            Weight = weight;
-        }
-    }
-    public static (int[] path, double length) RunAlgorithm(double[,] nodeDistances)
-    {
-        var n = nodeDistances.GetLength(0);
+        var nodeCount = distances.GetLength(0);
 
-        // Compute MST
-        var mst = ComputeMinimumSpanningTree(nodeDistances, n);
+        // 1. Minimum Spanning Tree (as adjacency matrix)
+        var mstEdgeCount = ComputeMinimumSpanningTree(distances);
 
-        // Find odd-degree vertices
-        var oddDegreeVerticesOutput = FindOddDegreeVertices(mst, n);
-        var adjacency = oddDegreeVerticesOutput.Item1;
-        var oddVertices = oddDegreeVerticesOutput.Item2;
-        
-        // Compute minimum-weight perfect matching
-        var matching = ComputeMinimumWeightMatching(oddVertices, nodeDistances);
+        // 2. Find odd-degree vertices in MST
+        var oddVertices = FindOddDegreeVertices(mstEdgeCount);
 
-        // Combine MST + matching → Eulerian multigraph
-        var eulerianGraph = CombineGraphs(mst, matching);
+        // 3. Minimum-weight perfect matching on odd vertices (Blossom)
+        var matching = RunBlossom(oddVertices, distances);
 
-        // Find Eulerian tour
-        var eulerianTour = FindEulerianTour(adjacency, n);
+        // 4. Combine MST + matching -> Eulerian multigraph
+        AddMatchingToGraph(mstEdgeCount, matching);
 
-        // Shortcut repeated vertices → Hamiltonian TSP tour
-        return ShortcutEulerianTour(eulerianTour, eulerianGraph);
+        // 5. Eulerian tour (Hierholzer)
+        var eulerianTour = FindEulerianTour(mstEdgeCount);
+
+        // 6. Shortcut Eulerian tour → Hamiltonian cycle
+        return ShortcutEulerianTour(eulerianTour, distances);
     }
 
-    public static List<Edge> ComputeMinimumSpanningTree(double[,] distances, int n)
+    # region MST
+
+    public static int[,] ComputeMinimumSpanningTree(double[,] distances)
     {
-        // Basic Prim's Algorithm
+        var n = distances.GetLength(0);
+        var edgeCount = new int[n, n];
+
         var inMst = new bool[n];
-        var key = new double[n];      // min edge weight to MST
-        var parent = new int[n];      // MST parent
-        var mst = new List<Edge>();
+        var key = new double[n];
+        var parent = new int[n];
 
-        for (var i = 0; i < n; i++) key[i] = double.MaxValue;
-        key[0] = 0; parent[0] = -1;
+        Array.Fill(key, double.MaxValue);
+        key[0] = 0;
+        parent[0] = -1;
 
-        for (var count = 0; count < n; count++)
+        for (var i = 0; i < n; i++)
         {
-            // Pick vertex with minimum key not in MST
-            var min = double.MaxValue; 
-            var u = -1;
-            for (var v = 0; v < n; v++)
-                if (!inMst[v] && key[v] < min)
-                { min = key[v]; u = v; }
-
+            var u = SelectMinKeyVertex(inMst, key);
             inMst[u] = true;
 
-            // Add edge to MST if not root
             if (parent[u] != -1)
-                mst.Add(new Edge(parent[u], u, distances[parent[u], u]));
+            {
+                edgeCount[u, parent[u]]++;
+                edgeCount[parent[u], u]++;
+            }
 
-            // Update key values for neighbors
-            for (var v = 0; v < n; v++)
-                if (!inMst[v] && distances[u, v] < key[v])
-                {
-                    key[v] = distances[u, v];
-                    parent[v] = u;
-                }
+            UpdateKeys(u, distances, inMst, key, parent);
         }
 
-        return mst;
+        return edgeCount;
     }
 
-    public static (int[,], List<int>) FindOddDegreeVertices(List<Edge> mst, int n)
+    private static int SelectMinKeyVertex(bool[] inMst, double[] key)
     {
-        var vertexDegrees = new int[n, n];
-        foreach (var e in mst)
+        var minIndex = -1;
+        var minValue = double.MaxValue;
+
+        for (var i = 0; i < key.Length; i++)
         {
-            vertexDegrees[e.PointA, e.PointB]++;
-            vertexDegrees[e.PointB, e.PointA]++;
+            if (!inMst[i] && key[i] < minValue)
+            {
+                minValue = key[i];
+                minIndex = i;
+            }
         }
 
+        return minIndex;
+    }
+
+    private static void UpdateKeys(
+        int u,
+        double[,] distances,
+        bool[] inMst,
+        double[] key,
+        int[] parent)
+    {
+        var n = distances.GetLength(0);
+
+        for (var v = 0; v < n; v++)
+        {
+            if (!inMst[v] && distances[u, v] < key[v])
+            {
+                key[v] = distances[u, v];
+                parent[v] = u;
+            }
+        }
+    }
+    
+    # endregion
+
+    # region OddDegree
+    public static List<int> FindOddDegreeVertices(int[,] edgeCount)
+    {
+        var n = edgeCount.GetLength(0);
         var oddVertices = new List<int>();
+
         for (var u = 0; u < n; u++)
         {
             var degree = 0;
-
             for (var v = 0; v < n; v++)
-            {
-                degree += vertexDegrees[u, v];
-            }
+                degree += edgeCount[u, v];
 
             if (degree % 2 == 1)
                 oddVertices.Add(u);
         }
 
-        return (vertexDegrees,  oddVertices);
+        return oddVertices;
     }
 
-    public static List<Edge> ComputeMinimumWeightMatching(List<int> oddVertices, double[,] nodeDistances)
-    {
-        // Need Blossom Algorithm Implementation
-        return null;
-    }
+    # endregion
+    
+    # region Blossom
 
-    public static List<Edge> CombineGraphs(List<Edge> mst, List<Edge> matching)
+    public static List<(int u, int v)> RunBlossom(List<int> vertices, double[,] distances)
     {
-        var combined = new List<Edge>(mst.Count + matching.Count);
-        combined.AddRange(mst);
-        combined.AddRange(matching);
-        return combined;    
-    }
+        var matching = new List<(int u, int v)>();
+        var matched = new HashSet<int>();
 
-    public static List<int> FindEulerianTour(int[,] adjacency, int n) // Using Hierholzer's algorithm
-    {
-        var currentPath = new List<int> { 0 };
-        var graphCircuit = new List<int>();
-        while (currentPath.Count > 0)
+        // Generate all edges with weights
+        var edges = new List<(int u, int v, double weight)>();
+        for (var i = 0; i < vertices.Count; i++)
         {
-            var currentNode = currentPath.Last();
-
-            if (adjacency.GetLength(currentNode) > 0)
+            for (var j = i + 1; j < vertices.Count; j++)
             {
-                var nextNode = adjacency[currentNode, adjacency.GetLength(currentNode) - 1];
-                adjacency[currentNode, adjacency.GetLength(currentNode) - 1] = 0;
-                
-                currentPath.Add(nextNode);
+                var u = vertices[i];
+                var v = vertices[j];
+                edges.Add((u, v, distances[u, v]));
+            }
+        }
+
+        // Sort edges by weight ascending
+        edges.Sort((a, b) => a.weight.CompareTo(b.weight));
+
+        // Greedily pick edges where neither vertex is already matched
+        foreach (var (u, v, w) in edges)
+        {
+            if (!matched.Contains(u) && !matched.Contains(v))
+            {
+                matching.Add((u, v));
+                matched.Add(u);
+                matched.Add(v);
+            }
+        }
+
+        // Safety check: all vertices matched
+        if (matched.Count != vertices.Count)
+            throw new InvalidOperationException("Matching incomplete, odd number of vertices?");
+
+        return matching;
+    }
+    
+    # endregion
+    
+    # region AddGraphs
+
+    public static void AddMatchingToGraph(int[,] edgeCount, List<(int u, int v)> matching)
+    {
+        foreach (var (u, v) in matching)
+        {
+            edgeCount[u, v]++;
+            edgeCount[v, u]++;
+        }
+    }
+
+    # endregion
+    
+    # region EulerianTour
+
+    public static List<int> FindEulerianTour(int[,] edgeCount)
+    {
+        var n = edgeCount.GetLength(0);
+        var stack = new Stack<int>();
+        var circuit = new List<int>();
+
+        stack.Push(0);
+
+        while (stack.Count > 0)
+        {
+            var u = stack.Peek();
+            var v = FindNextNeighbor(u, edgeCount);
+
+            if (v != -1)
+            {
+                edgeCount[u, v]--;
+                edgeCount[v, u]--;
+                stack.Push(v);
             }
             else
             {
-                graphCircuit.Add(currentPath.Last());
-                currentPath.RemoveAt(currentPath.Count - 1);
+                circuit.Add(stack.Pop());
             }
         }
-        graphCircuit.Reverse();
-        return graphCircuit;
+
+        circuit.Reverse();
+        return circuit;
     }
 
-    public static (int[], double) ShortcutEulerianTour(List<int> eulerianTour, List<Edge> eulerianGraph)
+    private static int FindNextNeighbor(int u, int[,] edgeCount)
     {
-        var visited = new HashSet<int>();
+        var n = edgeCount.GetLength(0);
+        for (var v = 0; v < n; v++)
+            if (edgeCount[u, v] > 0)
+                return v;
+
+        return -1;
+    }
+
+    # endregion
+    
+    # region Shortcut
+
+    public static (int[] tour, double length) ShortcutEulerianTour(List<int> eulerianTour, double[,] distances)
+    {
+        var visited = new bool[distances.GetLength(0)];
         var tour = new List<int>();
-        var tourLength = 0.00;
-        var lastPoint = 1;
+        double cost = 0;
+
+        var previous = eulerianTour[0];
+        tour.Add(previous);
+        visited[previous] = true;
 
         foreach (var v in eulerianTour)
         {
-            if (visited.Contains(v))
+            if (!visited[v])
             {
-                continue;
+                cost += distances[previous, v];
+                previous = v;
+                tour.Add(v);
+                visited[v] = true;
             }
-            var weight = eulerianGraph.Where(x => x.PointA == lastPoint && x.PointB == v).FirstOrDefault().Weight;
-            if (weight == 0)
-            {
-                throw new Exception("Not good");
-            }
-            tour.Add(v);
-            visited.Add(v);
-            tourLength += weight;
-            lastPoint = v;
         }
 
-        // Close the cycle
+        cost += distances[previous, tour[0]];
         tour.Add(tour[0]);
-        var returnDistance = eulerianGraph.Where(x => x.PointA == lastPoint && x.PointB == 1).FirstOrDefault().Weight;
-        if (returnDistance == 0)
-        {
-            throw new Exception("Not good");
-        }
-        
-        tourLength += returnDistance;
-        
-        return (tour.ToArray(), tourLength);
+
+        return (tour.ToArray(), cost);
     }
+    
+    # endregion
 }
