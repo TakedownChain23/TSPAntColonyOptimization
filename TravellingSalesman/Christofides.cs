@@ -12,7 +12,7 @@ public static class Christofides
         // 2. Find odd-degree vertices in MST
         var oddVertices = FindOddDegreeVertices(mstEdgeCount);
 
-        // 3. Minimum-weight perfect matching on odd vertices (Blossom)
+        // 3. Greedy matching on odd vertices (Greedy Blossom implementation)
         var matching = RunBlossom(oddVertices, distances);
 
         // 4. Combine MST + matching -> Eulerian multigraph
@@ -21,7 +21,7 @@ public static class Christofides
         // 5. Eulerian tour (Hierholzer)
         var eulerianTour = FindEulerianTour(mstEdgeCount);
 
-        // 6. Shortcut Eulerian tour → Hamiltonian cycle
+        // 6. Shortcut revisited vertices in Eulerian tour -> Hamiltonian cycle
         return ShortcutEulerianTour(eulerianTour, distances);
     }
 
@@ -74,12 +74,7 @@ public static class Christofides
         return minIndex;
     }
 
-    private static void UpdateKeys(
-        int u,
-        double[,] distances,
-        bool[] inMst,
-        double[] key,
-        int[] parent)
+    private static void UpdateKeys(int u, double[,] distances, bool[] inMst, double[] key, int[] parent)
     {
         var n = distances.GetLength(0);
 
@@ -118,6 +113,7 @@ public static class Christofides
     
     # region Blossom
 
+    // Using a less complex greedy blossom algorithm instead of Edmonds Blossom
     public static List<(int u, int v)> RunBlossom(List<int> vertices, double[,] distances)
     {
         var matching = new List<(int u, int v)>();
@@ -149,10 +145,6 @@ public static class Christofides
             }
         }
 
-        // Safety check: all vertices matched
-        if (matched.Count != vertices.Count)
-            throw new InvalidOperationException("Matching incomplete, odd number of vertices?");
-
         return matching;
     }
     
@@ -162,6 +154,7 @@ public static class Christofides
 
     public static void AddMatchingToGraph(int[,] edgeCount, List<(int u, int v)> matching)
     {
+        // Combine MST and Matching from Blossom
         foreach (var (u, v) in matching)
         {
             edgeCount[u, v]++;
@@ -197,7 +190,8 @@ public static class Christofides
                 circuit.Add(stack.Pop());
             }
         }
-
+        
+        // Current circuit will back backwards
         circuit.Reverse();
         return circuit;
     }
@@ -206,8 +200,12 @@ public static class Christofides
     {
         var n = edgeCount.GetLength(0);
         for (var v = 0; v < n; v++)
+        {
             if (edgeCount[u, v] > 0)
+            {
                 return v;
+            }
+        }
 
         return -1;
     }
