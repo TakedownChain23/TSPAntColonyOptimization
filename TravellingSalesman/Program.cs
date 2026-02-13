@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using TravellingSalesman;
 
-const string filePath = "TSPLIB/easy25.tsp";
+const string filePath = "TSPLIB/eil51.tsp";
 
 var distanceMatrix = TSPHelper.ParseTSPFile(filePath);
 
@@ -14,8 +14,8 @@ stopwatch.Stop();
 
 // Display results
 Console.WriteLine($"Optimal Path Length: {pathLength}");
-Console.WriteLine($"Optimal Path: {string.Join(" -> ", path)}");
-Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalSeconds} seconds");
+Console.WriteLine($"Optimal Path: {string.Join(" -> ", path)} -> {path[0]}");
+Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalSeconds} seconds\n");
 
 stopwatch = Stopwatch.StartNew();
 Console.WriteLine("Running Christofides Algorithm for TSP...\n");

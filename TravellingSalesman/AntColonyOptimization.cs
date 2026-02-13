@@ -5,13 +5,14 @@ public static class AntColonyOptimization
     readonly static int ColonySize = 400;
     readonly static int Iterations = 400;
 
+    // Weights for pheromone and distance heuristic
     readonly static double Alpha = 1;
-    readonly static double Beta = 2;
+    readonly static double Beta = 3;
 
-    readonly static double Rho = 0.2;
-
+    readonly static double PheremoneEvaporationRate = 0.2;
     readonly static double PheremoneDepositWeight = 1;
 
+    // Min value for pheremone deposit relative to max
     readonly static double MinScalingFactor = 0.001;
 
     public static (int[] nodes, double length) RunTSP(double[,] distanceMatrix)
@@ -19,26 +20,31 @@ public static class AntColonyOptimization
         var nodeCount = distanceMatrix.GetLength(0);
         var pheremoneMatrix = new double[nodeCount, nodeCount];
 
-        (int[] nodes, double length) result = GetInitialPathResult(distanceMatrix);
+        (int[] nodes, double length) result = GetInitialResult(distanceMatrix);
         UpdatePheremones(pheremoneMatrix, result.length);
 
         for (int i = 0; i < Iterations; i++)
         {
-            var paths = new List<(int[] nodes, double length)>();
+            var paths = new (int[] nodes, double length)[ColonySize];
 
-            Parallel.For(0, ColonySize, _ =>
+            // Construct path for each ant in parallel
+            Parallel.For(0, ColonySize, i =>
             {
                 var pathNodes = ConstructPath(distanceMatrix, pheremoneMatrix);
-                paths.Add((pathNodes, GetPathLength(distanceMatrix, pathNodes)));
+                var pathLength = GetPathLength(distanceMatrix, pathNodes);
+
+                paths[i] = (pathNodes, pathLength);
             });
 
+            // Set result to new shortest path
             var shortestPath = paths.MinBy(p => p.length);
             if (shortestPath.length < result.length)
             {
                 result = shortestPath;
-                Console.WriteLine($"Iteration: {i}, New Length: {shortestPath.length}");
+                Console.WriteLine($"New Length: {shortestPath.length:F3} (Iteration: {i})");
             }
 
+            // Deposit pheromone on the interations best path and evaporate globally
             AddPheremones(pheremoneMatrix, shortestPath.nodes, shortestPath.length);
             UpdatePheremones(pheremoneMatrix, result.length);
         }
@@ -46,7 +52,8 @@ public static class AntColonyOptimization
         return result;
     }
 
-    static (int[] path, double length) GetInitialPathResult(double[,] distanceMatrix)
+    // Get random starting path
+    static (int[] nodes, double length) GetInitialResult(double[,] distanceMatrix)
     {
         var nodes = Enumerable.Range(0, distanceMatrix.GetLength(0)).ToArray();
         return (nodes, GetPathLength(distanceMatrix, nodes));
@@ -63,6 +70,7 @@ public static class AntColonyOptimization
         return length;
     }
 
+    // Build a path with each node once
     static int[] ConstructPath(double[,] distanceMatrix, double[,] pheremoneMatrix)
     {
         var nodeCount = distanceMatrix.GetLength(0);
@@ -75,6 +83,7 @@ public static class AntColonyOptimization
 
         for (int i = 1; i < nodeCount; i++)
         {
+            // Select the next node using heuristic
             nextNode = GetNextNode(distanceMatrix, pheremoneMatrix, nextNode, remainingNodes);
             pathNodes[i] = nextNode;
 
@@ -84,6 +93,7 @@ public static class AntColonyOptimization
         return pathNodes;
     }
 
+    // Get the attractiveness of each remaining node, and choose one with roulette wheel selection
     static int GetNextNode(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, List<int> remainingNodes)
     {
         var probabilities = remainingNodes.Select(n => CalculateRelativeProbability(distanceMatrix, pheremoneMatrix, currentNode, n)).ToArray();
@@ -102,14 +112,16 @@ public static class AntColonyOptimization
         return remainingNodes.Last();
     }
 
+    // Pheromone and distance heuristic for edge attractiveness
     static double CalculateRelativeProbability(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, int nextNode)
     {
-        return Math.Pow(pheremoneMatrix[currentNode, nextNode], Alpha) * Math.Pow(1.0 / (distanceMatrix[currentNode, nextNode] + 0.05), Beta);
+        return Math.Pow(pheremoneMatrix[currentNode, nextNode], Alpha) * Math.Pow(1.0 / (distanceMatrix[currentNode, nextNode] + 0.001), Beta);
     }
 
+    // Add pheremones on the edges of a path
     static void AddPheremones(double[,] pheremoneMatrix, int[] pathNodes, double pathLength)
     {
-        var pheremoneDeposit = PheremoneDepositWeight / (pathLength + 0.05);
+        var pheremoneDeposit = PheremoneDepositWeight / (pathLength + 0.001);
 
         for (int i = 0; i < pathNodes.Length - 1; i++)
         {
@@ -121,6 +133,7 @@ public static class AntColonyOptimization
         pheremoneMatrix[pathNodes[0], pathNodes[^1]] += pheremoneDeposit;
     }
 
+    // Evaporate pheromones and clamp with min and max bounds
     static void UpdatePheremones(double[,] pheremoneMatrix, double shortestPathLength)
     {
         var max = PheremoneDepositWeight / shortestPathLength;
@@ -130,7 +143,7 @@ public static class AntColonyOptimization
         {
             for (int j = 0; j < pheremoneMatrix.GetLength(1); j++)
             {
-                pheremoneMatrix[i, j] = Math.Clamp(pheremoneMatrix[i, j] * (1 - Rho), min, max);
+                pheremoneMatrix[i, j] = Math.Clamp(pheremoneMatrix[i, j] * (1 - PheremoneEvaporationRate), min, max);
             }
         }
     }

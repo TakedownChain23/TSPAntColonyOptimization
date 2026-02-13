@@ -11,6 +11,9 @@
       <None Update="TSPLIB\berlin52.tsp">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+      <None Update="TSPLIB\easy25.tsp">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
       <None Update="TSPLIB\eil51.tsp">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>

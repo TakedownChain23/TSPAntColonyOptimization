@@ -73,15 +73,4 @@ public static class TSPHelper
 
         return distanceMatrix;
     }
-
-    public static double CalculatePathLength(double[,] distanceMatrix, int[] path)
-    {
-        double length = distanceMatrix[path[^1], path[0]];
-        for (int i = 0; i < path.Length - 1; i++)
-        {
-            length += distanceMatrix[path[i], path[i + 1]];
-        }
-
-        return length;
-    }
 }
