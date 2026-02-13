@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using TravellingSalesman;
 
 const string filePath = "TSPLIB/easy25.tsp";
