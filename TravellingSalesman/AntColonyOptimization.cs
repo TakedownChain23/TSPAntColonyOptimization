@@ -9,19 +9,19 @@ public static class AntColonyOptimization
     readonly static double Alpha = 1;
     readonly static double Beta = 3;
 
-    readonly static double PheremoneEvaporationRate = 0.2;
-    readonly static double PheremoneDepositWeight = 1;
+    readonly static double PheromoneEvaporationRate = 0.2;
+    readonly static double PheromoneDepositWeight = 1;
 
-    // Min value for pheremone deposit relative to max
+    // Min value for pheromone deposit relative to max
     readonly static double MinScalingFactor = 0.001;
 
     public static (int[] nodes, double length) RunTSP(double[,] distanceMatrix, int seed = 42)
     {
         var nodeCount = distanceMatrix.GetLength(0);
-        var pheremoneMatrix = new double[nodeCount, nodeCount];
+        var pheromoneMatrix = new double[nodeCount, nodeCount];
 
         (int[] nodes, double length) result = GetInitialResult(distanceMatrix);
-        UpdatePheremones(pheremoneMatrix, result.length);
+        UpdatePheromones(pheromoneMatrix, result.length);
 
         for (int i = 0; i < Iterations; i++)
         {
@@ -30,7 +30,7 @@ public static class AntColonyOptimization
             // Construct path for each ant in parallel
             Parallel.For(0, ColonySize, j =>
             {
-                var pathNodes = ConstructPath(distanceMatrix, pheremoneMatrix, new(GenerateSeed(i, j, seed)));
+                var pathNodes = ConstructPath(distanceMatrix, pheromoneMatrix, new(GenerateSeed(i, j, seed)));
                 var pathLength = GetPathLength(distanceMatrix, pathNodes);
 
                 paths[j] = (pathNodes, pathLength);
@@ -45,8 +45,8 @@ public static class AntColonyOptimization
             }
 
             // Deposit pheromone on the interations best path and evaporate globally
-            AddPheremones(pheremoneMatrix, shortestPath.nodes, shortestPath.length);
-            UpdatePheremones(pheremoneMatrix, result.length);
+            AddPheromones(pheromoneMatrix, shortestPath.nodes, shortestPath.length);
+            UpdatePheromones(pheromoneMatrix, result.length);
         }
 
         return result;
@@ -80,7 +80,7 @@ public static class AntColonyOptimization
     }
 
     // Build a path with each node once
-    static int[] ConstructPath(double[,] distanceMatrix, double[,] pheremoneMatrix, Random randomGenerator)
+    static int[] ConstructPath(double[,] distanceMatrix, double[,] pheromoneMatrix, Random randomGenerator)
     {
         var nodeCount = distanceMatrix.GetLength(0);
         var nextNode = randomGenerator.Next(nodeCount);
@@ -93,7 +93,7 @@ public static class AntColonyOptimization
         for (int i = 1; i < nodeCount; i++)
         {
             // Select the next node using heuristic
-            nextNode = GetNextNode(distanceMatrix, pheremoneMatrix, nextNode, remainingNodes, randomGenerator);
+            nextNode = GetNextNode(distanceMatrix, pheromoneMatrix, nextNode, remainingNodes, randomGenerator);
             pathNodes[i] = nextNode;
 
             remainingNodes.Remove(nextNode);
@@ -103,9 +103,9 @@ public static class AntColonyOptimization
     }
 
     // Get the attractiveness of each remaining node, and choose one with roulette wheel selection
-    static int GetNextNode(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, List<int> remainingNodes, Random randomGenerator)
+    static int GetNextNode(double[,] distanceMatrix, double[,] pheromoneMatrix, int currentNode, List<int> remainingNodes, Random randomGenerator)
     {
-        var probabilities = remainingNodes.Select(n => CalculateRelativeProbability(distanceMatrix, pheremoneMatrix, currentNode, n)).ToArray();
+        var probabilities = remainingNodes.Select(n => CalculateRelativeProbability(distanceMatrix, pheromoneMatrix, currentNode, n)).ToArray();
 
         var randomValue = randomGenerator.NextDouble() * probabilities.Sum();
         var cumulativeValue = 0.0;
@@ -122,37 +122,37 @@ public static class AntColonyOptimization
     }
 
     // Pheromone and distance heuristic for edge attractiveness
-    static double CalculateRelativeProbability(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, int nextNode)
+    static double CalculateRelativeProbability(double[,] distanceMatrix, double[,] pheromoneMatrix, int currentNode, int nextNode)
     {
-        return Math.Pow(pheremoneMatrix[currentNode, nextNode], Alpha) * Math.Pow(1.0 / (distanceMatrix[currentNode, nextNode] + 0.001), Beta);
+        return Math.Pow(pheromoneMatrix[currentNode, nextNode], Alpha) * Math.Pow(1.0 / (distanceMatrix[currentNode, nextNode] + 0.001), Beta);
     }
 
-    // Add pheremones on the edges of a path
-    static void AddPheremones(double[,] pheremoneMatrix, int[] pathNodes, double pathLength)
+    // Add pheromones on the edges of a path
+    static void AddPheromones(double[,] pheromoneMatrix, int[] pathNodes, double pathLength)
     {
-        var pheremoneDeposit = PheremoneDepositWeight / (pathLength + 0.001);
+        var pheromoneDeposit = PheromoneDepositWeight / (pathLength + 0.001);
 
         for (int i = 0; i < pathNodes.Length - 1; i++)
         {
-            pheremoneMatrix[pathNodes[i], pathNodes[i + 1]] += pheremoneDeposit;
-            pheremoneMatrix[pathNodes[i + 1], pathNodes[i]] += pheremoneDeposit;
+            pheromoneMatrix[pathNodes[i], pathNodes[i + 1]] += pheromoneDeposit;
+            pheromoneMatrix[pathNodes[i + 1], pathNodes[i]] += pheromoneDeposit;
         }
 
-        pheremoneMatrix[pathNodes[^1], pathNodes[0]] += pheremoneDeposit;
-        pheremoneMatrix[pathNodes[0], pathNodes[^1]] += pheremoneDeposit;
+        pheromoneMatrix[pathNodes[^1], pathNodes[0]] += pheromoneDeposit;
+        pheromoneMatrix[pathNodes[0], pathNodes[^1]] += pheromoneDeposit;
     }
 
     // Evaporate pheromones and clamp with min and max bounds
-    static void UpdatePheremones(double[,] pheremoneMatrix, double shortestPathLength)
+    static void UpdatePheromones(double[,] pheromoneMatrix, double shortestPathLength)
     {
-        var max = PheremoneDepositWeight / shortestPathLength;
+        var max = PheromoneDepositWeight / shortestPathLength;
         var min = max * MinScalingFactor;
         
-        for (int i = 0; i < pheremoneMatrix.GetLength(0); i++)
+        for (int i = 0; i < pheromoneMatrix.GetLength(0); i++)
         {
-            for (int j = 0; j < pheremoneMatrix.GetLength(1); j++)
+            for (int j = 0; j < pheromoneMatrix.GetLength(1); j++)
             {
-                pheremoneMatrix[i, j] = Math.Clamp(pheremoneMatrix[i, j] * (1 - PheremoneEvaporationRate), min, max);
+                pheromoneMatrix[i, j] = Math.Clamp(pheromoneMatrix[i, j] * (1 - PheromoneEvaporationRate), min, max);
             }
         }
     }
