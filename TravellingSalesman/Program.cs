@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using TravellingSalesman;
 
-const string filePath = "TSPLIB/eil51.tsp";
+const string filePath = "TSPLIB/easy25.tsp";
 
 var distanceMatrix = TSPHelper.ParseTSPFile(filePath);
 

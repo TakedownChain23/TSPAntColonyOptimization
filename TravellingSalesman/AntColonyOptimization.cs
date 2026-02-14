@@ -15,7 +15,7 @@ public static class AntColonyOptimization
     // Min value for pheremone deposit relative to max
     readonly static double MinScalingFactor = 0.001;
 
-    public static (int[] nodes, double length) RunTSP(double[,] distanceMatrix)
+    public static (int[] nodes, double length) RunTSP(double[,] distanceMatrix, int seed = 42)
     {
         var nodeCount = distanceMatrix.GetLength(0);
         var pheremoneMatrix = new double[nodeCount, nodeCount];
@@ -28,12 +28,12 @@ public static class AntColonyOptimization
             var paths = new (int[] nodes, double length)[ColonySize];
 
             // Construct path for each ant in parallel
-            Parallel.For(0, ColonySize, i =>
+            Parallel.For(0, ColonySize, j =>
             {
-                var pathNodes = ConstructPath(distanceMatrix, pheremoneMatrix);
+                var pathNodes = ConstructPath(distanceMatrix, pheremoneMatrix, new(GenerateSeed(i, j, seed)));
                 var pathLength = GetPathLength(distanceMatrix, pathNodes);
 
-                paths[i] = (pathNodes, pathLength);
+                paths[j] = (pathNodes, pathLength);
             });
 
             // Set result to new shortest path
@@ -50,6 +50,15 @@ public static class AntColonyOptimization
         }
 
         return result;
+    }
+
+    // Generate a seed given 2 loop indices
+    static int GenerateSeed(int i, int j, int baseSeed)
+    {
+        unchecked
+        {
+            return (baseSeed * 73856093) ^ (i * 19349663) ^ (j * 83492791);
+        }
     }
 
     // Get random starting path
@@ -71,10 +80,10 @@ public static class AntColonyOptimization
     }
 
     // Build a path with each node once
-    static int[] ConstructPath(double[,] distanceMatrix, double[,] pheremoneMatrix)
+    static int[] ConstructPath(double[,] distanceMatrix, double[,] pheremoneMatrix, Random randomGenerator)
     {
         var nodeCount = distanceMatrix.GetLength(0);
-        var nextNode = new Random().Next(nodeCount);
+        var nextNode = randomGenerator.Next(nodeCount);
         var pathNodes = new int[nodeCount];
         pathNodes[0] = nextNode;
 
@@ -84,7 +93,7 @@ public static class AntColonyOptimization
         for (int i = 1; i < nodeCount; i++)
         {
             // Select the next node using heuristic
-            nextNode = GetNextNode(distanceMatrix, pheremoneMatrix, nextNode, remainingNodes);
+            nextNode = GetNextNode(distanceMatrix, pheremoneMatrix, nextNode, remainingNodes, randomGenerator);
             pathNodes[i] = nextNode;
 
             remainingNodes.Remove(nextNode);
@@ -94,11 +103,11 @@ public static class AntColonyOptimization
     }
 
     // Get the attractiveness of each remaining node, and choose one with roulette wheel selection
-    static int GetNextNode(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, List<int> remainingNodes)
+    static int GetNextNode(double[,] distanceMatrix, double[,] pheremoneMatrix, int currentNode, List<int> remainingNodes, Random randomGenerator)
     {
         var probabilities = remainingNodes.Select(n => CalculateRelativeProbability(distanceMatrix, pheremoneMatrix, currentNode, n)).ToArray();
 
-        var randomValue = new Random().NextDouble() * probabilities.Sum();
+        var randomValue = randomGenerator.NextDouble() * probabilities.Sum();
         var cumulativeValue = 0.0;
         for (int i = 0; i < remainingNodes.Count - 1; i++)
         {
